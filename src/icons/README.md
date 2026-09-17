@@ -1,1 +1,1 @@
-Icons derived from [GNOME Icon Development Kit](https://gitlab.gnome.org/Teams/Design/icon-development-kit), licensed under CC0 1.0 Universal (see [COPYING.md](https://gitlab.gnome.org/Teams/Design/icon-development-kit/-/blob/main/COPYING.md)).
+Icons derived from [Tabler Icons](https://tabler.io/icons) (specifically, `ball-football` and `ball-football-off`), licensed under the MIT License (see [`LICENSE`](tabler/LICENSE)).

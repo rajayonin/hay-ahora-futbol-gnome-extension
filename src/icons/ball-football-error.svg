@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="2 2 20 20" fill="none" stroke="#77767b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-ball-football">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+  <path d="M12 5.5v-2.5m3.9375 14.125l1.5625 1.875m.6625 -9.09375l2.3375 -.90625m-12.4 8.15625l-1.6 1.84375m-.6625 -9.09375l-2.3375 -.90625" />
+  <path d="M10 10a2 2 0 1 1 3.5 1.33c-.83.88-1.5 1.17-1.5 2.67" />
+  <path d="M12 17h.01" />
+</svg>

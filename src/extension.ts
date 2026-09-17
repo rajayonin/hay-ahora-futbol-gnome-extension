@@ -35,6 +35,7 @@ const STATUS_URL = "https://hayahora.futbol/estado/blocked-any.txt";
 const STATUS_PAGE_URL = "https://hayahora.futbol/#estado";
 const CHECKER_PAGE_URL = "https://hayahora.futbol/#comprobador";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const HAY_FUTBOL_THRESHOLD = 50;  // number of blocked IPs in order to consider there is football
 
 class Indicator extends PanelMenu.Button {
   private _icon: St.Icon;
@@ -71,7 +72,15 @@ class Indicator extends PanelMenu.Button {
     this.add_child(this._icon);
 
     // IP count (also serves as open page button)
-    this._countItem = new PopupMenu.PopupMenuItem("");
+    this._countItem = new PopupMenu.PopupMenuItem(
+      // default parameters
+      "Unable to refresh",
+      {
+        activate: false,
+        hover: false,
+        can_focus: false,
+      },
+    );
     this._countItem.connect("activate", () => {
       this.#openURL(STATUS_PAGE_URL);
     });
@@ -90,7 +99,7 @@ class Indicator extends PanelMenu.Button {
     checkPage.connect("activate", () => {
       this.#openURL(CHECKER_PAGE_URL);
     });
-    this.menu.addMenuItem(checkPage)
+    this.menu.addMenuItem(checkPage);
   }
 
   #openURL(url: string) {
@@ -114,7 +123,7 @@ class Indicator extends PanelMenu.Button {
    * @param count Number of blocked IPs
    */
   update(count: number) {
-    const hayFurbo = count > 0;
+    const hayFurbo = count > HAY_FUTBOL_THRESHOLD;
     this.accessible_name = hayFurbo ? _("Hay fútbol") : _("No hay fútbol");
 
     // update menu
@@ -141,8 +150,15 @@ class Indicator extends PanelMenu.Button {
    * @param message Error message
    */
   setError(message: string) {
+    // update icon
     this._icon.gicon = this._GICONS.error;
-    this._countItem.label.text = _("Unable to refresh blocked IPs");
+
+    // update count
+    this._countItem.label.text = _("Unable to refresh");
+    this._countItem.sensitive = false;
+    this._countItem.reactive = false;
+    this._countItem.can_focus = false;
+
     console.error(message);
   }
 }
@@ -223,11 +239,9 @@ export default class HayAhoraFutbolExtension extends Extension {
         this._indicator?.update(blockedCount);
       })
       .catch((error) => {
-        if (error instanceof Error && error.message.includes("Cancelled")) {
-          this._indicator?.setError(
-            `Unable to fetch blocked IPs: ${error.message}`,
-          );
-        }
+        this._indicator?.setError(
+          `Unable to fetch blocked IPs: ${error.message}`,
+        );
       })
       .finally(() => {
         this._refreshInProgress = false;
