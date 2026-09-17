@@ -53,13 +53,13 @@ class Indicator extends PanelMenu.Button {
     // define set of icons
     this._GICONS = {
       football: Gio.icon_new_for_string(
-        `${extensionPath}/icons/football-symbolic.svg`,
+        `${extensionPath}/icons/ball-football.svg`,
       ),
       noFootball: Gio.icon_new_for_string(
-        `${extensionPath}/icons/football-symbolic-off.svg`,
+        `${extensionPath}/icons/ball-football-off.svg`,
       ),
       error: Gio.icon_new_for_string(
-        `${extensionPath}/icons/football-symbolic-error.svg`,
+        `${extensionPath}/icons/ball-football-error.svg`,
       ),
     };
 
