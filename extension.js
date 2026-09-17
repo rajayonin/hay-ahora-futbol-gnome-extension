@@ -34,11 +34,6 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 const STATUS_URL = "https://hayahora.futbol/estado/blocked-any.txt";
 const STATUS_PAGE_URL = "https://hayahora.futbol/#estado";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const ICONS = {
-  football: "tabler/ball-football.svg",
-  noFootball: "tabler/ball-football-off.svg",
-  error: "custom/ball-football-error.svg"
-}
 
 const Indicator = GObject.registerClass(
   {
@@ -52,13 +47,24 @@ const Indicator = GObject.registerClass(
 
       this._extensionPath = extensionPath;
 
+      // define set of icons
+      this._GICONS = {
+        football: Gio.icon_new_for_string(
+          `${this._extensionPath}/icons/football-symbolic.svg`,
+        ),
+        noFootball: Gio.icon_new_for_string(
+          `${this._extensionPath}/icons/football-symbolic-off.svg`,
+        ),
+        error: Gio.icon_new_for_string(
+          `${this._extensionPath}/icons/football-symbolic-error.svg`,
+        ),
+      };
+
       // icon
       this._icon = new St.Icon({
-        gicon: Gio.icon_new_for_string(
-          `${this._extensionPath}/icons/${ICONS.error}`, // default
-        ),
+        gicon: this._GICONS.error,
         style_class: "system-status-icon",
-      });
+      }); // default
       this.add_child(this._icon);
 
       // IP count
@@ -90,12 +96,8 @@ const Indicator = GObject.registerClass(
      * @param {number} count Number of blocked IPs
      */
     update(count) {
-      const iconPath =
-        count > 0 ? ICONS.football : ICONS.noFootball;
-
-      this._icon.gicon = Gio.icon_new_for_string(
-        `${this._extensionPath}/icons/${iconPath}`,
-      );
+      this._icon.gicon =
+        count > 0 ? this._GICONS.football : this._GICONS.noFootball;
       this._countItem.label.text = _("Blocked IPs: ") + count;
       this.accessible_name = _("Blocked IPs: ") + count;
     }
@@ -105,13 +107,6 @@ const Indicator = GObject.registerClass(
      * @param {bool} refreshing
      */
     setRefreshing(refreshing) {
-      // update icon
-      if (refreshing) {
-        this._icon.gicon = Gio.icon_new_for_string(
-          `${this._extensionPath}/icons/${ICONS.error}`,
-        );
-      }
-
       this._refreshItem.setSensitive(!refreshing);
     }
 
@@ -120,9 +115,7 @@ const Indicator = GObject.registerClass(
      * @param {string} message Error message
      */
     setError(message) {
-      this._icon.gicon = Gio.icon_new_for_string(
-        `${this._extensionPath}/icons/custom/ball-football-error.svg`,
-      );
+      this._icon.gicon = this._GICONS.error;
       this._countItem.label.text = _("Unable to refresh blocked IPs");
       console.error(message);
     }

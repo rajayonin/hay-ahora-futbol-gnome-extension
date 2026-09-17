@@ -1,3 +1,1 @@
-`ball-football` and `ball-football-off` icons provided by [Tabler Icons](https://tabler.io/icons), under the MIT License. See [`LICENSE`](tabler/LICENSE).
-
-`ball-footbal-question` icon derived from the other two.
+Icons derived from [GNOME Icon Development Kit](https://gitlab.gnome.org/Teams/Design/icon-development-kit), licensed under CC0 1.0 Universal (see [COPYING.md](https://gitlab.gnome.org/Teams/Design/icon-development-kit/-/blob/main/COPYING.md)).
