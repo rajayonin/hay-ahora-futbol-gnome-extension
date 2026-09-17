@@ -33,6 +33,7 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 const STATUS_URL = "https://hayahora.futbol/estado/blocked-any.txt";
 const STATUS_PAGE_URL = "https://hayahora.futbol/#estado";
+const CHECKER_PAGE_URL = "https://hayahora.futbol/#comprobador";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 class Indicator extends PanelMenu.Button {
@@ -69,36 +70,43 @@ class Indicator extends PanelMenu.Button {
     }); // default
     this.add_child(this._icon);
 
-    // IP count
-    this._countItem = new PopupMenu.PopupMenuItem("", {
-      reactive: false,
-      can_focus: false,
+    // IP count (also serves as open page button)
+    this._countItem = new PopupMenu.PopupMenuItem("");
+    this._countItem.connect("activate", () => {
+      this.#openURL(STATUS_PAGE_URL);
     });
     this.menu.addMenuItem(this._countItem);
+
+    // separator
+    this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(""));
 
     // refresh button
     this._refreshItem = new PopupMenu.PopupMenuItem(_("Refresh"));
     this._refreshItem.connect("activate", () => this.emit("refresh"));
     this.menu.addMenuItem(this._refreshItem);
 
-    // open status page button
-    const statusPageItem = new PopupMenu.PopupMenuItem(_("Open status page"));
-    statusPageItem.connect("activate", () => {
-      try {
-        Gio.AppInfo.launch_default_for_uri(STATUS_PAGE_URL, null);
-      } catch (error) {
-        let msg = "";
-        if (error instanceof GLib.Error) {
-          msg = `[${error.code}] ${error.message}`;
-        } else if (error instanceof Error) {
-          msg = error.message;
-        } else {
-          msg = String(error);
-        }
-        console.error(`Unable to open ${STATUS_PAGE_URL}: ${msg}`);
-      }
+    // check webpage
+    const checkPage = new PopupMenu.PopupMenuItem("Check webpage");
+    checkPage.connect("activate", () => {
+      this.#openURL(CHECKER_PAGE_URL);
     });
-    this.menu.addMenuItem(statusPageItem);
+    this.menu.addMenuItem(checkPage)
+  }
+
+  #openURL(url: string) {
+    try {
+      Gio.AppInfo.launch_default_for_uri(url, null);
+    } catch (error) {
+      let msg = "";
+      if (error instanceof GLib.Error) {
+        msg = `[${error.code}] ${error.message}`;
+      } else if (error instanceof Error) {
+        msg = error.message;
+      } else {
+        msg = String(error);
+      }
+      console.error(`Unable to open ${url}: ${msg}`);
+    }
   }
 
   /**
@@ -106,10 +114,18 @@ class Indicator extends PanelMenu.Button {
    * @param count Number of blocked IPs
    */
   update(count: number) {
+    const hayFurbo = count > 0;
+    this.accessible_name = hayFurbo ? _("Hay fútbol") : _("No hay fútbol");
+
+    // update menu
+    this._countItem.label.text = _(`${count} blocked IPs`);
+    this._countItem.sensitive = hayFurbo;
+    this._countItem.reactive = hayFurbo;
+    this._countItem.can_focus = hayFurbo;
+
+    // update icon
     this._icon.gicon =
       count > 0 ? this._GICONS.football : this._GICONS.noFootball;
-    this._countItem.label.text = _("Blocked IPs: ") + count;
-    this.accessible_name = _("Blocked IPs: ") + count;
   }
 
   /**
@@ -191,7 +207,7 @@ export default class HayAhoraFutbolExtension extends Extension {
     this._session!.send_and_read_async(
       message,
       GLib.PRIORITY_DEFAULT,
-      this._cancellable as any,  // `as any` bc Glib is being stupid
+      this._cancellable as any, // `as any` bc Glib is being stupid
     )
       .then((bytes) => {
         if (message.status_code !== Soup.Status.OK)
