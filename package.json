@@ -1,0 +1,27 @@
+{
+  "name": "hay-ahora-futbol",
+  "version": "0.1.0",
+  "description": "GNOME Extension that checks if IPs are blocked in Spain due to football retransmitions, using hayahora.futbol.",
+  "type": "module",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rajayonin/hay-ahora-futbol-gnome-extension.git"
+  },
+  "author": "Luis Daniel Casais <rajayonin@protonmail.com>",
+  "license": "GPL-2.0-or-later",
+  "bugs": {
+    "url": "https://github.com/rajayonin/hay-ahora-futbol-gnome-extension/issues"
+  },
+  "homepage": "https://github.com/rajayonin/hay-ahora-futbol-gnome-extension#readme",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@girs/gjs": "^5.2.0",
+    "@girs/gnome-shell": "^50.0.4",
+    "@girs/soup-3.0": "^5.2.0",
+    "typescript": "^7.0.2"
+  }
+}

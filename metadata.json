@@ -1,7 +1,8 @@
 {
-  "uuid": "hayahorafutbol@rajayonin",
+  "uuid": "hay-ahora-futbol@rajayonin",
   "name": "¿Hay ahora fútbol?",
-  "description": "Checks if IPs are blocked in Spain due to footbal retransmitions, using hayahora.futbol.",
-  "shell-version": ["50"],
-  "url": "https://github.com/rajayonin/hayahorafutbol-gnome-extension"
+  "description": "Checks if IPs are blocked in Spain due to football retransmitions, using hayahora.futbol.",
+  "url": "https://github.com/rajayonin/hay-ahora-futbol-gnome-extension",
+  "settings-schema": "org.gnome.shell.extensions.hay-ahora-futbol",
+  "shell-version": ["45", "46", "47", "48", "49", "50"]
 }
