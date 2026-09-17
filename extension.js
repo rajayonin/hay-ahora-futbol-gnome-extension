@@ -34,6 +34,11 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 const STATUS_URL = "https://hayahora.futbol/estado/blocked-any.txt";
 const STATUS_PAGE_URL = "https://hayahora.futbol/#estado";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const ICONS = {
+  football: "tabler/ball-football.svg",
+  noFootball: "tabler/ball-football-off.svg",
+  error: "custom/ball-football-error.svg"
+}
 
 const Indicator = GObject.registerClass(
   {
@@ -48,10 +53,9 @@ const Indicator = GObject.registerClass(
       this._extensionPath = extensionPath;
 
       // icon
-      const iconName = "ball-football-off.svg";
       this._icon = new St.Icon({
         gicon: Gio.icon_new_for_string(
-          `${this._extensionPath}/icons/${iconName}`,
+          `${this._extensionPath}/icons/${ICONS.error}`, // default
         ),
         style_class: "system-status-icon",
       });
@@ -86,11 +90,11 @@ const Indicator = GObject.registerClass(
      * @param {number} count Number of blocked IPs
      */
     update(count) {
-      const iconName =
-        count > 0 ? "ball-football.svg" : "ball-football-off.svg";
+      const iconPath =
+        count > 0 ? ICONS.football : ICONS.noFootball;
 
       this._icon.gicon = Gio.icon_new_for_string(
-        `${this._extensionPath}/icons/${iconName}`,
+        `${this._extensionPath}/icons/${iconPath}`,
       );
       this._countItem.label.text = _("Blocked IPs: ") + count;
       this.accessible_name = _("Blocked IPs: ") + count;
@@ -101,6 +105,13 @@ const Indicator = GObject.registerClass(
      * @param {bool} refreshing
      */
     setRefreshing(refreshing) {
+      // update icon
+      if (refreshing) {
+        this._icon.gicon = Gio.icon_new_for_string(
+          `${this._extensionPath}/icons/${ICONS.error}`,
+        );
+      }
+
       this._refreshItem.setSensitive(!refreshing);
     }
 
@@ -109,6 +120,9 @@ const Indicator = GObject.registerClass(
      * @param {string} message Error message
      */
     setError(message) {
+      this._icon.gicon = Gio.icon_new_for_string(
+        `${this._extensionPath}/icons/custom/ball-football-error.svg`,
+      );
       this._countItem.label.text = _("Unable to refresh blocked IPs");
       console.error(message);
     }
