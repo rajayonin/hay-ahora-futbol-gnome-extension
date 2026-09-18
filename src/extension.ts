@@ -52,9 +52,24 @@ const ISP_VALUES = new Map<string, ISP>([
   ["M247 Europe SRL", ISP.Movistar], // O2
   ["Digi Spain Telecom S.L", ISP.DIGI], // Digi
   ["VODAFONE-NETWORK", ISP.Vodafone], // Vodafone
+  ["Vodafone Espana S.A.U.", ISP.Vodafone], // Vodafone
+  ["Ono", ISP.Vodafone], // Ono
   ["Orange Spain", ISP.Orange], // Orange/Jazztel
   ["Global ISP by PriorityTelecom Spain", ISP.MásMóvil],
 ]);
+
+/**
+ * Parses the ip-api.com 'isp' values.
+ */
+function parseISP(value: string): ISP {
+  return (
+    ISP_VALUES.get(value) ??
+    Object.values(ISP).find(
+      (isp) => isp !== ISP.Any && value.toLocaleLowerCase().includes(isp),
+    ) ??
+    ISP.Any
+  );
+}
 
 class Indicator extends PanelMenu.Button {
   #icon: St.Icon;
@@ -69,6 +84,9 @@ class Indicator extends PanelMenu.Button {
 
   constructor(extensionPath: string) {
     super(0.0, _("¿Hay ahora fútbol?"));
+
+    // reduce horizontal padding in the top bar
+    this.add_style_class_name("haf-panel-button");
 
     // define set of icons
     this.#GICONS = {
@@ -146,13 +164,6 @@ class Indicator extends PanelMenu.Button {
   }
 
   /**
-   * Capitalizes a string
-   */
-  #capitalize(s: string): string {
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  }
-
-  /**
    * Updates the indicator according to the number of blocked IPs
    * @param count Number of blocked IPs
    */
@@ -161,9 +172,7 @@ class Indicator extends PanelMenu.Button {
     this.accessible_name = hayFurbo ? _("Hay fútbol") : _("No hay fútbol");
 
     // update menu
-    this.#countItem.label.text = _(
-      `${count} blocked IPs (${this.#capitalize(provider)})`,
-    );
+    this.#countItem.label.text = _(`${count} blocked IPs (${provider})`);
     this.#toggleCountButton(true);
 
     // update icon
@@ -263,7 +272,7 @@ export default class HayAhoraFutbolExtension extends Extension {
         const ispValue = JSON.parse(
           new TextDecoder().decode(bytes.toArray()),
         ).isp;
-        return ISP_VALUES.get(ispValue) ?? ISP.Any;
+        return parseISP(ispValue);
       })
       .catch((error) => {
         console.log(`Unable to fetch ISP: ${error.message}`);
