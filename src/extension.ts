@@ -31,10 +31,30 @@ import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
-const STATUS_URL = "https://hayahora.futbol/estado/blocked-any.txt";
+const STATUS_URL = "https://hayahora.futbol/estado";
 const STATUS_PAGE_URL = "https://hayahora.futbol/#estado";
+const IP_API_ENDPOINT = "http://ip-api.com/json/";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const HAY_FUTBOL_THRESHOLD = 50; // number of blocked IPs in order to consider there is football
+const HAY_FUTBOL_THRESHOLD = 40; // number of blocked IPs in order to consider there is football
+
+enum ISP {
+  Any = "any",
+  Movistar = "movistar",
+  DIGI = "digi",
+  Vodafone = "vodafone",
+  Orange = "orange",
+  MásMóvil = "masmovil",
+}
+
+// ISP values according to ip-api.com
+const ISP_VALUES = new Map<string, ISP>([
+  ["Telefonica de Espana SAU", ISP.Movistar], // Movistar/Telefónica
+  ["M247 Europe SRL", ISP.Movistar], // O2
+  ["Digi Spain Telecom S.L", ISP.DIGI], // Digi
+  ["VODAFONE-NETWORK", ISP.Vodafone], // Vodafone
+  ["Orange Spain", ISP.Orange], // Orange/Jazztel
+  ["Global ISP by PriorityTelecom Spain", ISP.MásMóvil],
+]);
 
 class Indicator extends PanelMenu.Button {
   private _icon: St.Icon;
@@ -99,7 +119,7 @@ class Indicator extends PanelMenu.Button {
    * Opens the URL with the default browser
    * @param url URL to open
    */
-  #openURL(url: string) {
+  #openURL(url: string): void {
     try {
       Gio.AppInfo.launch_default_for_uri(url, null);
     } catch (error) {
@@ -119,22 +139,31 @@ class Indicator extends PanelMenu.Button {
    * Enables/Disables the count button
    * @param status `true` to enable, `false` to disable
    */
-  #toggleCountButton(status: boolean) {
+  #toggleCountButton(status: boolean): void {
     this._countItem.sensitive = status;
     this._countItem.reactive = status;
     this._countItem.can_focus = status;
   }
 
   /**
+   * Capitalizes a string
+   */
+  #capitalize(s: string): string {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  /**
    * Updates the indicator according to the number of blocked IPs
    * @param count Number of blocked IPs
    */
-  update(count: number) {
+  update(count: number, provider: ISP): void {
     const hayFurbo = count > HAY_FUTBOL_THRESHOLD;
     this.accessible_name = hayFurbo ? _("Hay fútbol") : _("No hay fútbol");
 
     // update menu
-    this._countItem.label.text = _(`${count} blocked IPs`);
+    this._countItem.label.text = _(
+      `${count} blocked IPs (${this.#capitalize(provider)})`,
+    );
     this.#toggleCountButton(true);
 
     // update icon
@@ -176,10 +205,11 @@ export default class HayAhoraFutbolExtension extends Extension {
   private _refreshInProgress: boolean = false;
   private _refreshSignalId: number = 0;
   private _refreshTimerId: number = 0;
+  private _provider: ISP = ISP.Any;
 
   enable() {
     this._indicator = new Indicator(this.path);
-    this._session = new Soup.Session({ timeout: 15 });
+    this._session = new Soup.Session({ timeout: 10 });
     this._refreshInProgress = false;
     this._cancellable = new Gio.Cancellable();
     Main.panel.addToStatusArea(this.uuid, this._indicator);
@@ -216,40 +246,69 @@ export default class HayAhoraFutbolExtension extends Extension {
     this._session = null;
   }
 
-  async _refresh() {
+  async _refresh(): Promise<void> {
     if (this._refreshInProgress || !this._indicator) return;
 
     this._refreshInProgress = true;
     this._indicator.setRefreshing(true);
 
-    // get data from hayahora.futbol
-    const message = Soup.Message.new("GET", STATUS_URL);
+    // get number of blocked IPs
+
+    // get provider
+    const providerMsg = Soup.Message.new("GET", IP_API_ENDPOINT);
     this._session!.send_and_read_async(
-      message,
+      providerMsg,
       GLib.PRIORITY_DEFAULT,
       this._cancellable as any, // `as any` bc Glib is being stupid
     )
       .then((bytes) => {
-        if (message.status_code !== Soup.Status.OK)
+        if (providerMsg.status_code !== Soup.Status.OK)
           throw new Error(
-            `Status request returned HTTP ${message.status_code}`,
+            `Provider request returned HTTP ${providerMsg.status_code}`,
           );
 
-        // count IPs (one line per IP)
-        const text = new TextDecoder().decode((bytes as GLib.Bytes).toArray());
-        const blockedCount = text
-          .split(/\r?\n/)
-          .filter((line) => line.trim()).length;
-        this._indicator?.update(blockedCount);
+        // extract ISP
+        const ispValue = JSON.parse(
+          new TextDecoder().decode(bytes.toArray()),
+        ).isp;
+        this._provider = ISP_VALUES.get(ispValue) ?? ISP.Any;
+
+        // get data from hayahora.futbol
+        const statusMsg = Soup.Message.new(
+          "GET",
+          `${STATUS_URL}/blocked-${this._provider}.txt`,
+        );
+        this._session!.send_and_read_async(
+          statusMsg,
+          GLib.PRIORITY_DEFAULT,
+          this._cancellable as any, // `as any` bc Glib is being stupid
+        )
+          .then((bytes) => {
+            if (statusMsg.status_code !== Soup.Status.OK)
+              throw new Error(
+                `Status request returned HTTP ${statusMsg.status_code}`,
+              );
+
+            // count IPs (one line per IP)
+            const text = new TextDecoder().decode(bytes.toArray());
+            const blockedCount = text
+              .split(/\r?\n/)
+              .filter((line) => line.trim()).length;
+            this._indicator?.update(blockedCount, this._provider);
+          })
+          .catch((error) => {
+            this._indicator?.setError(
+              `Unable to fetch blocked IPs: ${error.message}`,
+            );
+          })
+          .finally(() => {
+            this._refreshInProgress = false;
+            this._indicator?.setRefreshing(false);
+          });
       })
       .catch((error) => {
-        this._indicator?.setError(
-          `Unable to fetch blocked IPs: ${error.message}`,
-        );
-      })
-      .finally(() => {
-        this._refreshInProgress = false;
-        this._indicator?.setRefreshing(false);
+        this._provider = ISP.Any;
+        console.log(`Unable to fetch ISP: ${error.message}`);
       });
   }
 }
