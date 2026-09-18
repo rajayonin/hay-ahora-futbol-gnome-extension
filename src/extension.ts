@@ -112,11 +112,7 @@ class Indicator extends PanelMenu.Button {
     this.#countItem = new PopupMenu.PopupMenuItem(
       // default parameters
       "Unable to refresh",
-      {
-        activate: false,
-        hover: false,
-        can_focus: false,
-      },
+      { hover: false, can_focus: false },
     );
     this.#countItem.connect("activate", () => {
       this.#openURL(STATUS_PAGE_URL);
