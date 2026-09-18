@@ -34,7 +34,7 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 const STATUS_URL = "https://hayahora.futbol/estado/blocked-any.txt";
 const STATUS_PAGE_URL = "https://hayahora.futbol/#estado";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const HAY_FUTBOL_THRESHOLD = 50;  // number of blocked IPs in order to consider there is football
+const HAY_FUTBOL_THRESHOLD = 50; // number of blocked IPs in order to consider there is football
 
 class Indicator extends PanelMenu.Button {
   private _icon: St.Icon;
@@ -130,8 +130,9 @@ class Indicator extends PanelMenu.Button {
     this._countItem.can_focus = hayFurbo;
 
     // update icon
-    this._icon.gicon =
-      count > 0 ? this._GICONS.football : this._GICONS.noFootball;
+    this._icon.gicon = hayFurbo
+      ? this._GICONS.football
+      : this._GICONS.noFootball;
   }
 
   /**
