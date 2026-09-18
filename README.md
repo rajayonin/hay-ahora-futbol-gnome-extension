@@ -7,7 +7,7 @@ Requires [Bun](https://bun.sh/). If you want to use [NPM](https://npmjs.com)/[PN
 
 1. Clone the repo:
    ```
-   git clone https://github.com/rajayonin/hayahorafutbol-gnome-extension.git
+   git clone https://github.com/rajayonin/hay-ahora-futbol-gnome-extension.git
    ```
 2. Run:
    ```
