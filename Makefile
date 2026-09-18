@@ -14,6 +14,7 @@ dist/extension.js dist/prefs.js: bun.lock *.ts
 
 $(PACK_NAME).zip: dist/extension.js dist/prefs.js 
 	@cp -r src/icons/ dist/
+	@cp src/stylesheet.css dist/
 	@cp metadata.json dist/
 	@(cd dist && zip ../$(PACK_NAME).zip -9r .)
 
