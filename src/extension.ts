@@ -57,21 +57,21 @@ const ISP_VALUES = new Map<string, ISP>([
 ]);
 
 class Indicator extends PanelMenu.Button {
-  private _icon: St.Icon;
-  private _GICONS: {
+  #icon: St.Icon;
+  #GICONS: {
     football: Gio.Icon;
     noFootball: Gio.Icon;
     error: Gio.Icon;
   };
-  private _countItem: PopupMenu.PopupMenuItem;
-  private _refreshItem: PopupMenu.PopupMenuItem;
+  #countItem: PopupMenu.PopupMenuItem;
+  #refreshItem: PopupMenu.PopupMenuItem;
   declare public menu: PopupMenu.PopupMenu;
 
   constructor(extensionPath: string) {
     super(0.0, _("¿Hay ahora fútbol?"));
 
     // define set of icons
-    this._GICONS = {
+    this.#GICONS = {
       football: Gio.icon_new_for_string(
         `${extensionPath}/icons/ball-football.svg`,
       ),
@@ -84,14 +84,14 @@ class Indicator extends PanelMenu.Button {
     };
 
     // icon
-    this._icon = new St.Icon({
-      gicon: this._GICONS.error,
+    this.#icon = new St.Icon({
+      gicon: this.#GICONS.error,
       style_class: "system-status-icon",
     }); // default
-    this.add_child(this._icon);
+    this.add_child(this.#icon);
 
     // IP count (also serves as open page button)
-    this._countItem = new PopupMenu.PopupMenuItem(
+    this.#countItem = new PopupMenu.PopupMenuItem(
       // default parameters
       "Unable to refresh",
       {
@@ -100,19 +100,19 @@ class Indicator extends PanelMenu.Button {
         can_focus: false,
       },
     );
-    this._countItem.connect("activate", () => {
+    this.#countItem.connect("activate", () => {
       this.#openURL(STATUS_PAGE_URL);
     });
-    this._countItem.accessibleName = "Click to view IPs";
-    this.menu.addMenuItem(this._countItem);
+    this.#countItem.accessibleName = "Click to view IPs";
+    this.menu.addMenuItem(this.#countItem);
 
     // separator
     this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(""));
 
     // refresh button
-    this._refreshItem = new PopupMenu.PopupMenuItem(_("Refresh"));
-    this._refreshItem.connect("activate", () => this.emit("refresh"));
-    this.menu.addMenuItem(this._refreshItem);
+    this.#refreshItem = new PopupMenu.PopupMenuItem(_("Refresh"));
+    this.#refreshItem.connect("activate", () => this.emit("refresh"));
+    this.menu.addMenuItem(this.#refreshItem);
   }
 
   /**
@@ -140,9 +140,9 @@ class Indicator extends PanelMenu.Button {
    * @param status `true` to enable, `false` to disable
    */
   #toggleCountButton(status: boolean): void {
-    this._countItem.sensitive = status;
-    this._countItem.reactive = status;
-    this._countItem.can_focus = status;
+    this.#countItem.sensitive = status;
+    this.#countItem.reactive = status;
+    this.#countItem.can_focus = status;
   }
 
   /**
@@ -161,15 +161,15 @@ class Indicator extends PanelMenu.Button {
     this.accessible_name = hayFurbo ? _("Hay fútbol") : _("No hay fútbol");
 
     // update menu
-    this._countItem.label.text = _(
+    this.#countItem.label.text = _(
       `${count} blocked IPs (${this.#capitalize(provider)})`,
     );
     this.#toggleCountButton(true);
 
     // update icon
-    this._icon.gicon = hayFurbo
-      ? this._GICONS.football
-      : this._GICONS.noFootball;
+    this.#icon.gicon = hayFurbo
+      ? this.#GICONS.football
+      : this.#GICONS.noFootball;
   }
 
   /**
@@ -177,7 +177,7 @@ class Indicator extends PanelMenu.Button {
    * @param refreshing
    */
   setRefreshing(refreshing: boolean) {
-    this._refreshItem.setSensitive(!refreshing);
+    this.#refreshItem.setSensitive(!refreshing);
   }
 
   /**
@@ -186,10 +186,10 @@ class Indicator extends PanelMenu.Button {
    */
   setError(message: string) {
     // update icon
-    this._icon.gicon = this._GICONS.error;
+    this.#icon.gicon = this.#GICONS.error;
 
     // update count
-    this._countItem.label.text = _("Unable to refresh");
+    this.#countItem.label.text = _("Unable to refresh");
     this.#toggleCountButton(false);
 
     console.error(message);
@@ -199,116 +199,125 @@ GObject.registerClass({ Signals: { refresh: {} } }, Indicator);
 
 export default class HayAhoraFutbolExtension extends Extension {
   gsettings?: Gio.Settings;
-  private _indicator: Indicator | null = null;
-  private _session: Soup.Session | null = null;
-  private _cancellable: Gio.Cancellable | null = null;
-  private _refreshInProgress: boolean = false;
-  private _refreshSignalId: number = 0;
-  private _refreshTimerId: number = 0;
-  private _provider: ISP = ISP.Any;
+  #indicator: Indicator | null = null;
+  #session: Soup.Session | null = null;
+  #cancellable: Gio.Cancellable | null = null;
+  #refreshInProgress: boolean = false;
+  #refreshSignalId: number = 0;
+  #refreshTimerId: number = 0;
 
   enable() {
-    this._indicator = new Indicator(this.path);
-    this._session = new Soup.Session({ timeout: 10 });
-    this._refreshInProgress = false;
-    this._cancellable = new Gio.Cancellable();
-    Main.panel.addToStatusArea(this.uuid, this._indicator);
+    this.#indicator = new Indicator(this.path);
+    this.#session = new Soup.Session({ timeout: 10 });
+    this.#refreshInProgress = false;
+    this.#cancellable = new Gio.Cancellable();
+    Main.panel.addToStatusArea(this.uuid, this.#indicator);
 
     // connect indicator's refresh button
-    this._refreshSignalId = this._indicator.connect("refresh", () => {
-      this._refresh();
+    this.#refreshSignalId = this.#indicator.connect("refresh", () => {
+      this.refresh();
     });
 
-    this._refresh();
+    this.refresh();
 
     // setup autorefresh
-    this._refreshTimerId = GLib.timeout_add(
+    this.#refreshTimerId = GLib.timeout_add(
       GLib.PRIORITY_DEFAULT,
       REFRESH_INTERVAL_MS,
       () => {
-        this._refresh();
+        this.refresh();
         return GLib.SOURCE_CONTINUE;
       },
     );
   }
 
   disable() {
-    if (this._refreshTimerId) {
-      GLib.Source.remove(this._refreshTimerId);
-      this._refreshTimerId = 0;
+    if (this.#refreshTimerId) {
+      GLib.Source.remove(this.#refreshTimerId);
+      this.#refreshTimerId = 0;
     }
-    this._cancellable?.cancel();
-    this._indicator!.disconnect(this._refreshSignalId);
+    this.#cancellable?.cancel();
+    this.#indicator!.disconnect(this.#refreshSignalId);
 
-    this._indicator!.destroy();
-    this._indicator = null;
-    this._cancellable = null;
-    this._session = null;
+    this.#indicator!.destroy();
+    this.#indicator = null;
+    this.#cancellable = null;
+    this.#session = null;
   }
 
-  async _refresh(): Promise<void> {
-    if (this._refreshInProgress || !this._indicator) return;
-
-    this._refreshInProgress = true;
-    this._indicator.setRefreshing(true);
-
-    // get number of blocked IPs
-
-    // get provider
-    const providerMsg = Soup.Message.new("GET", IP_API_ENDPOINT);
-    this._session!.send_and_read_async(
-      providerMsg,
+  /**
+   * Gets the provider. By default, `ISP.Any`.
+   */
+  async #getProvider(): Promise<ISP> {
+    const msg = Soup.Message.new("GET", IP_API_ENDPOINT);
+    return this.#session!.send_and_read_async(
+      msg,
       GLib.PRIORITY_DEFAULT,
-      this._cancellable as any, // `as any` bc Glib is being stupid
+      this.#cancellable as any, // `as any` bc Glib is being stupid
     )
       .then((bytes) => {
-        if (providerMsg.status_code !== Soup.Status.OK)
-          throw new Error(
-            `Provider request returned HTTP ${providerMsg.status_code}`,
-          );
+        if (msg.status_code !== Soup.Status.OK)
+          throw new Error(`Provider request returned HTTP ${msg.status_code}`);
 
         // extract ISP
         const ispValue = JSON.parse(
           new TextDecoder().decode(bytes.toArray()),
         ).isp;
-        this._provider = ISP_VALUES.get(ispValue) ?? ISP.Any;
-
-        // get data from hayahora.futbol
-        const statusMsg = Soup.Message.new(
-          "GET",
-          `${STATUS_URL}/blocked-${this._provider}.txt`,
-        );
-        this._session!.send_and_read_async(
-          statusMsg,
-          GLib.PRIORITY_DEFAULT,
-          this._cancellable as any, // `as any` bc Glib is being stupid
-        )
-          .then((bytes) => {
-            if (statusMsg.status_code !== Soup.Status.OK)
-              throw new Error(
-                `Status request returned HTTP ${statusMsg.status_code}`,
-              );
-
-            // count IPs (one line per IP)
-            const text = new TextDecoder().decode(bytes.toArray());
-            const blockedCount = text
-              .split(/\r?\n/)
-              .filter((line) => line.trim()).length;
-            this._indicator?.update(blockedCount, this._provider);
-          })
-          .catch((error) => {
-            this._indicator?.setError(
-              `Unable to fetch blocked IPs: ${error.message}`,
-            );
-          })
-          .finally(() => {
-            this._refreshInProgress = false;
-            this._indicator?.setRefreshing(false);
-          });
+        return ISP_VALUES.get(ispValue) ?? ISP.Any;
       })
       .catch((error) => {
-        this._provider = ISP.Any;
         console.log(`Unable to fetch ISP: ${error.message}`);
+        return ISP.Any;
+      });
+  }
+
+  /**
+   * Gets the number of blocked ISPs for the specified provider.
+   */
+  async #getCount(provider: ISP) {
+    const statusMsg = Soup.Message.new(
+      "GET",
+      `${STATUS_URL}/blocked-${provider}.txt`,
+    );
+    this.#session!.send_and_read_async(
+      statusMsg,
+      GLib.PRIORITY_DEFAULT,
+      this.#cancellable as any, // `as any` bc Glib is being stupid
+    )
+      .then((bytes) => {
+        if (statusMsg.status_code !== Soup.Status.OK)
+          throw new Error(
+            `Status request returned HTTP ${statusMsg.status_code}`,
+          );
+
+        // count IPs (one line per IP)
+        const text = new TextDecoder().decode(bytes.toArray());
+        const blockedCount = text
+          .split(/\r?\n/)
+          .filter((line) => line.trim()).length;
+        this.#indicator?.update(blockedCount, provider);
+      })
+      .catch((error) => {
+        this.#indicator?.setError(
+          `Unable to fetch blocked IPs: ${error.message}`,
+        );
+      });
+  }
+
+  /**
+   * Refreshes the data.
+   */
+  async refresh(): Promise<void> {
+    if (this.#refreshInProgress || !this.#indicator) return;
+
+    this.#refreshInProgress = true;
+    this.#indicator.setRefreshing(true);
+
+    this.#getProvider()
+      .then((p) => this.#getCount(p))
+      .finally(() => {
+        this.#refreshInProgress = false;
+        this.#indicator?.setRefreshing(false);
       });
   }
 }
