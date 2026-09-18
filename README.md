@@ -15,5 +15,10 @@ Requires [Bun](https://bun.sh/). If you want to use [NPM](https://npmjs.com)/[PN
    ```
 
 
+## Alternatives
+Not using GNOME? Try...
+- [Omarchy](https://omarchy.org/): [Lucacas05/omarchy-hay-futbol](https://github.com/Lucacas05/omarchy-hay-futbol)
+
+
 ## More information
 - [GJS GNOME Shell Extensions development guide](https://gjs.guide/extensions/)
