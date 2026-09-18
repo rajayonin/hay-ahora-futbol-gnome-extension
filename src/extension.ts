@@ -83,7 +83,7 @@ class Indicator extends PanelMenu.Button {
     this._countItem.connect("activate", () => {
       this.#openURL(STATUS_PAGE_URL);
     });
-    this._countItem.accessibleName = "Click to view IPs"
+    this._countItem.accessibleName = "Click to view IPs";
     this.menu.addMenuItem(this._countItem);
 
     // separator
@@ -116,6 +116,16 @@ class Indicator extends PanelMenu.Button {
   }
 
   /**
+   * Enables/Disables the count button
+   * @param status `true` to enable, `false` to disable
+   */
+  #toggleCountButton(status: boolean) {
+    this._countItem.sensitive = status;
+    this._countItem.reactive = status;
+    this._countItem.can_focus = status;
+  }
+
+  /**
    * Updates the indicator according to the number of blocked IPs
    * @param count Number of blocked IPs
    */
@@ -125,9 +135,7 @@ class Indicator extends PanelMenu.Button {
 
     // update menu
     this._countItem.label.text = _(`${count} blocked IPs`);
-    this._countItem.sensitive = hayFurbo;
-    this._countItem.reactive = hayFurbo;
-    this._countItem.can_focus = hayFurbo;
+    this.#toggleCountButton(true);
 
     // update icon
     this._icon.gicon = hayFurbo
@@ -153,9 +161,7 @@ class Indicator extends PanelMenu.Button {
 
     // update count
     this._countItem.label.text = _("Unable to refresh");
-    this._countItem.sensitive = false;
-    this._countItem.reactive = false;
-    this._countItem.can_focus = false;
+    this.#toggleCountButton(false);
 
     console.error(message);
   }
