@@ -33,7 +33,6 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 const STATUS_URL = "https://hayahora.futbol/estado/blocked-any.txt";
 const STATUS_PAGE_URL = "https://hayahora.futbol/#estado";
-const CHECKER_PAGE_URL = "https://hayahora.futbol/#comprobador";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const HAY_FUTBOL_THRESHOLD = 50;  // number of blocked IPs in order to consider there is football
 
@@ -84,6 +83,7 @@ class Indicator extends PanelMenu.Button {
     this._countItem.connect("activate", () => {
       this.#openURL(STATUS_PAGE_URL);
     });
+    this._countItem.accessibleName = "Click to view IPs"
     this.menu.addMenuItem(this._countItem);
 
     // separator
@@ -93,15 +93,12 @@ class Indicator extends PanelMenu.Button {
     this._refreshItem = new PopupMenu.PopupMenuItem(_("Refresh"));
     this._refreshItem.connect("activate", () => this.emit("refresh"));
     this.menu.addMenuItem(this._refreshItem);
-
-    // check webpage
-    const checkPage = new PopupMenu.PopupMenuItem("Check webpage");
-    checkPage.connect("activate", () => {
-      this.#openURL(CHECKER_PAGE_URL);
-    });
-    this.menu.addMenuItem(checkPage);
   }
 
+  /**
+   * Opens the URL with the default browser
+   * @param url URL to open
+   */
   #openURL(url: string) {
     try {
       Gio.AppInfo.launch_default_for_uri(url, null);
