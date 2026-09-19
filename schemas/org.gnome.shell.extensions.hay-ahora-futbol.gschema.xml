@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.hay-ahora-futbol" path="/org/gnome/shell/extensions/hay-ahora-futbol/">
+    <key name="refresh-interval" type="i">
+      <default>5</default>
+      <range min="1" max="1440"/>
+      <summary>Refresh interval</summary>
+      <description>Minutes between automatic status checks.</description>
+    </key>
+    <key name="threshold" type="i">
+      <default>40</default>
+      <range min="0" max="10000"/>
+      <summary>Football threshold</summary>
+      <description>Number of blocked IPs from which football is considered to be on.</description>
+    </key>
+    <key name="auto-provider" type="b">
+      <default>true</default>
+      <summary>Automatic provider</summary>
+      <description>Detect the current ISP with ip-api.com. When disabled the check is bypassed and all providers are used.</description>
+    </key>
+    <key name="notifications" type="b">
+      <default>true</default>
+      <summary>Notifications</summary>
+      <description>Whether to notify when football starts or ends.</description>
+    </key>
+  </schema>
+</schemalist>

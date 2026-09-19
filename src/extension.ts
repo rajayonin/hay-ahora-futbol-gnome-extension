@@ -35,8 +35,6 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 const STATUS_URL = "https://hayahora.futbol/estado";
 const STATUS_PAGE_URL = "https://hayahora.futbol/#estado";
 const IP_API_ENDPOINT = "http://ip-api.com/json/";
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const HAY_FUTBOL_THRESHOLD = 40; // number of blocked IPs in order to consider there is football
 
 enum ISP {
   Any = "any",
@@ -72,6 +70,12 @@ function parseISP(value: string): ISP {
   );
 }
 
+interface IndicatorOptions {
+  threshold: number;
+  notifications: boolean;
+  openPreferences: () => void;
+}
+
 class Indicator extends PanelMenu.Button {
   #icon: St.Icon;
   #GICONS: {
@@ -81,12 +85,20 @@ class Indicator extends PanelMenu.Button {
   };
   #countItem: PopupMenu.PopupMenuItem;
   #refreshItem: PopupMenu.PopupMenuItem;
+  #prefsItem: PopupMenu.PopupMenuItem;
   #notificationSource: MessageTray.Source | null = null;
   #hayFurbo: boolean | null = null;
+  #threshold: number;
+  #notificationsEnabled: boolean;
+  #lastCount: number | null = null;
+  #lastProvider: ISP | null = null;
   declare public menu: PopupMenu.PopupMenu;
 
-  constructor(extensionPath: string) {
+  constructor(extensionPath: string, options: IndicatorOptions) {
     super(0.0, _("¿Hay ahora fútbol?"));
+
+    this.#threshold = options.threshold;
+    this.#notificationsEnabled = options.notifications;
 
     // reduce horizontal padding in the top bar
     this.add_style_class_name("haf-panel-button");
@@ -130,6 +142,14 @@ class Indicator extends PanelMenu.Button {
     this.#refreshItem = new PopupMenu.PopupMenuItem(_("Refresh"));
     this.#refreshItem.connect("activate", () => this.emit("refresh"));
     this.menu.addMenuItem(this.#refreshItem);
+
+    // separator
+    this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(""));
+
+    // preferences button
+    this.#prefsItem = new PopupMenu.PopupMenuItem(_("Preferences"));
+    this.#prefsItem.connect("activate", options.openPreferences);
+    this.menu.addMenuItem(this.#prefsItem);
   }
 
   /**
@@ -206,9 +226,40 @@ class Indicator extends PanelMenu.Button {
   /**
    * Updates the indicator according to the number of blocked IPs
    * @param count Number of blocked IPs
+   * @param provider Provider that was checked
    */
   update(count: number, provider: ISP): void {
-    const hayFurbo = count > HAY_FUTBOL_THRESHOLD;
+    this.#lastCount = count;
+    this.#lastProvider = provider;
+    this.#apply();
+  }
+
+  /**
+   * Updates the football threshold and re-evaluates the current state.
+   * @param threshold New threshold
+   */
+  setThreshold(threshold: number): void {
+    this.#threshold = threshold;
+    this.#apply();
+  }
+
+  /**
+   * Enables/disables notifications on state changes.
+   * @param enabled `true` to notify
+   */
+  setNotificationsEnabled(enabled: boolean): void {
+    this.#notificationsEnabled = enabled;
+  }
+
+  /**
+   * Re-renders the indicator from the last known count.
+   */
+  #apply(): void {
+    const count = this.#lastCount;
+    const provider = this.#lastProvider;
+    if (count === null || provider === null) return;
+
+    const hayFurbo = count > this.#threshold;
     this.accessible_name = hayFurbo ? _("Hay fútbol") : _("No hay fútbol");
 
     // update menu
@@ -224,7 +275,7 @@ class Indicator extends PanelMenu.Button {
     // starts (including the first check) and when it stops
     const started = hayFurbo && this.#hayFurbo !== true;
     const stopped = !hayFurbo && this.#hayFurbo === true;
-    if (started || stopped) {
+    if ((started || stopped) && this.#notificationsEnabled) {
       this.#notify(hayFurbo, count, provider);
     }
     this.#hayFurbo = hayFurbo;
@@ -267,16 +318,23 @@ class Indicator extends PanelMenu.Button {
 GObject.registerClass({ Signals: { refresh: {} } }, Indicator);
 
 export default class HayAhoraFutbolExtension extends Extension {
-  gsettings?: Gio.Settings;
+  #settings: Gio.Settings | null = null;
   #indicator: Indicator | null = null;
   #session: Soup.Session | null = null;
   #cancellable: Gio.Cancellable | null = null;
   #refreshInProgress: boolean = false;
   #refreshSignalId: number = 0;
   #refreshTimerId: number = 0;
+  #settingsSignalIds: number[] = [];
 
   enable() {
-    this.#indicator = new Indicator(this.path);
+    this.#settings = this.getSettings();
+
+    this.#indicator = new Indicator(this.path, {
+      threshold: this.#settings.get_int("threshold"),
+      notifications: this.#settings.get_boolean("notifications"),
+      openPreferences: () => this.openPreferences(),
+    });
     this.#session = new Soup.Session({ timeout: 10 });
     this.#refreshInProgress = false;
     this.#cancellable = new Gio.Cancellable();
@@ -287,23 +345,35 @@ export default class HayAhoraFutbolExtension extends Extension {
       this.refresh();
     });
 
-    this.refresh();
+    // react to settings changes
+    this.#settingsSignalIds = [
+      this.#settings.connect("changed::threshold", () => {
+        this.#indicator?.setThreshold(this.#settings!.get_int("threshold"));
+      }),
+      this.#settings.connect("changed::notifications", () => {
+        this.#indicator?.setNotificationsEnabled(
+          this.#settings!.get_boolean("notifications"),
+        );
+      }),
+      this.#settings.connect("changed::auto-provider", () => this.refresh()),
+      this.#settings.connect("changed::refresh-interval", () =>
+        this.#scheduleRefresh(),
+      ),
+    ];
 
-    // setup autorefresh
-    this.#refreshTimerId = GLib.timeout_add(
-      GLib.PRIORITY_DEFAULT,
-      REFRESH_INTERVAL_MS,
-      () => {
-        this.refresh();
-        return GLib.SOURCE_CONTINUE;
-      },
-    );
+    this.refresh();
+    this.#scheduleRefresh();
   }
 
   disable() {
     if (this.#refreshTimerId) {
       GLib.Source.remove(this.#refreshTimerId);
       this.#refreshTimerId = 0;
+    }
+    if (this.#settings) {
+      for (const id of this.#settingsSignalIds) this.#settings.disconnect(id);
+      this.#settingsSignalIds = [];
+      this.#settings = null;
     }
     this.#cancellable?.cancel();
     this.#indicator!.disconnect(this.#refreshSignalId);
@@ -315,9 +385,40 @@ export default class HayAhoraFutbolExtension extends Extension {
   }
 
   /**
-   * Gets the provider. By default, `ISP.Any`.
+   * (Re)schedules the automatic refresh timer using the `refresh-interval`
+   * setting (in minutes).
+   */
+  #scheduleRefresh(): void {
+    if (this.#refreshTimerId) {
+      GLib.Source.remove(this.#refreshTimerId);
+      this.#refreshTimerId = 0;
+    }
+    const intervalMs = this.#settings!.get_int("refresh-interval") * 60 * 1000;
+    this.#refreshTimerId = GLib.timeout_add(
+      GLib.PRIORITY_DEFAULT,
+      intervalMs,
+      () => {
+        this.refresh();
+        return GLib.SOURCE_CONTINUE;
+      },
+    );
+  }
+
+  /**
+   * Resolves the provider to check. When the `auto-provider` setting is
+   * enabled the ISP is detected; otherwise the check is bypassed and
+   * `ISP.Any` (all providers) is used.
    */
   async #getProvider(): Promise<ISP> {
+    if (this.#settings!.get_boolean("auto-provider"))
+      return this.#detectProvider();
+    return ISP.Any;
+  }
+
+  /**
+   * Detects the provider using ip-api.com. By default, `ISP.Any`.
+   */
+  async #detectProvider(): Promise<ISP> {
     const msg = Soup.Message.new("GET", IP_API_ENDPOINT);
     return this.#session!.send_and_read_async(
       msg,

@@ -1,21 +1,27 @@
 NAME=hay-ahora-futbol
 DOMAIN=rajayonin
-PACK_NAME = $(NAME)@$(DOMAIN).zip
+SCHEMA_ID=org.gnome.shell.extensions.$(NAME)
+PACK_NAME=$(NAME)@$(DOMAIN)
 
 .PHONY: all pack install clean
 
-all: dist/extension.js
+all: dist/extension.js dist/prefs.js
 
-bun-lock.json: package.json
+bun.lock: package.json
 	bun install
 
-dist/extension.js dist/prefs.js: bun.lock *.ts
+dist/extension.js dist/prefs.js: bun.lock ambient.d.ts src/*.ts
 	bun run build
 
-$(PACK_NAME).zip: dist/extension.js dist/prefs.js 
+schemas/gschemas.compiled: schemas/$(SCHEMA_ID).gschema.xml
+	glib-compile-schemas schemas
+
+$(PACK_NAME).zip: dist/extension.js dist/prefs.js schemas/gschemas.compiled
 	@cp -r src/icons/ dist/
 	@cp src/stylesheet.css dist/
 	@cp metadata.json dist/
+	@mkdir -p dist/schemas
+	@cp schemas/$(SCHEMA_ID).gschema.xml dist/schemas/
 	@(cd dist && zip ../$(PACK_NAME).zip -9r .)
 
 pack: $(PACK_NAME).zip
