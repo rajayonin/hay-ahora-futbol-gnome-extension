@@ -202,7 +202,11 @@ export default class HayAhoraFutbolExtension extends Extension {
       this.#blockedByISP,
       this.#settings!.get_boolean("include-ipv6"),
     );
-    const { hayFutbol } = evaluate(blockedByISP, this.#evaluationOptions());
+    const { hayFutbol } = evaluate(
+      blockedByISP,
+      this.#provider,
+      this.#evaluationOptions(),
+    );
     const count = blockedByISP.get(this.#provider)?.size ?? 0;
     this.#indicator?.update(count, hayFutbol, this.#provider);
   }

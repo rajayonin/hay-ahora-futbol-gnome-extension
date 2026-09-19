@@ -87,12 +87,18 @@ export interface EvaluationOptions {
  * football is on when more than `footballIPThreshold` IPs are blocked by more
  * than `minISPs` ISPs, or when every key IP is blocked by at least one ISP.
  *
+ * The state is only reported for the detected provider: even if football is
+ * on nationally, it is not considered on when the provider itself has fewer
+ * than `footballIPThreshold` blocked IPs.
+ *
  * @param blockedByISP Blocked IPs per ISP
+ * @param provider Detected ISP
  * @param options Detection tunables
  * @returns Total number of blocked IPs and whether football is on
  */
 export function evaluate(
   blockedByISP: Map<ISP, Set<string>>,
+  provider: ISP,
   options: EvaluationOptions,
 ): {
   blocked: number;
@@ -117,9 +123,13 @@ export function evaluate(
     options.keyIPs.length > 0 &&
     options.keyIPs.every((ip) => blockedIPs.has(ip));
 
+  const providerBlocked = blockedByISP.get(provider)?.size ?? 0;
+
   return {
     blocked: blockedIPs.size,
-    hayFutbol: widelyBlocked > options.footballIPThreshold || keyPairBlocked,
+    hayFutbol:
+      providerBlocked >= options.footballIPThreshold &&
+      (widelyBlocked > options.footballIPThreshold || keyPairBlocked),
   };
 }
 
@@ -138,9 +148,6 @@ export function filterBlockedByISP(
 
   const filtered = new Map<ISP, Set<string>>();
   for (const [isp, ips] of blockedByISP)
-    filtered.set(
-      isp,
-      new Set([...ips].filter((ip) => !ip.includes(":"))),
-    );
+    filtered.set(isp, new Set([...ips].filter((ip) => !ip.includes(":"))));
   return filtered;
 }
