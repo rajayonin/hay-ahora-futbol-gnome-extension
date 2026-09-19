@@ -28,6 +28,7 @@ import {
 } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
+import * as MessageTray from "resource:///org/gnome/shell/ui/messageTray.js";
 
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
@@ -80,6 +81,8 @@ class Indicator extends PanelMenu.Button {
   };
   #countItem: PopupMenu.PopupMenuItem;
   #refreshItem: PopupMenu.PopupMenuItem;
+  #notificationSource: MessageTray.Source | null = null;
+  #hayFurbo: boolean | null = null;
   declare public menu: PopupMenu.PopupMenu;
 
   constructor(extensionPath: string) {
@@ -150,6 +153,47 @@ class Indicator extends PanelMenu.Button {
   }
 
   /**
+   * Lazily creates the notification source, reusing it while it is alive.
+   */
+  #getNotificationSource(): MessageTray.Source {
+    if (!this.#notificationSource) {
+      this.#notificationSource = new MessageTray.Source({
+        title: _("¿Hay ahora fútbol?"),
+        icon: this.#GICONS.football,
+      });
+      this.#notificationSource.connect("destroy", () => {
+        this.#notificationSource = null;
+      });
+      Main.messageTray.add(this.#notificationSource);
+    }
+    return this.#notificationSource;
+  }
+
+  /**
+   * Sends a notification about the football state.
+   * @param hayFurbo `true` if there is football, `false` if it stopped
+   * @param count Number of blocked IPs
+   * @param provider Detected ISP
+   */
+  #notify(hayFurbo: boolean, count: number, provider: ISP): void {
+    const source = this.#getNotificationSource();
+    const notification = new MessageTray.Notification({
+      source,
+      title: hayFurbo ? _("Hay fútbol") : _("Ya no hay fútbol"),
+      body: hayFurbo
+        ? _(
+            `${count} blocked IPs (${provider} provider). Some services may be blocked.`,
+          )
+        : _("Football broadcasts have ended."),
+      urgency: hayFurbo ? MessageTray.Urgency.NORMAL : MessageTray.Urgency.LOW,
+    });
+    const openStatus = () => this.#openURL(STATUS_PAGE_URL);
+    notification.connect("activated", openStatus);
+    notification.addAction(_("View IPs"), openStatus);
+    source.addNotification(notification);
+  }
+
+  /**
    * Enables/Disables the count button
    * @param status `true` to enable, `false` to disable
    */
@@ -175,6 +219,26 @@ class Indicator extends PanelMenu.Button {
     this.#icon.gicon = hayFurbo
       ? this.#GICONS.football
       : this.#GICONS.noFootball;
+
+    // notify on transitions (not on every refresh): when football
+    // starts (including the first check) and when it stops
+    const started = hayFurbo && this.#hayFurbo !== true;
+    const stopped = !hayFurbo && this.#hayFurbo === true;
+    if (started || stopped) {
+      this.#notify(hayFurbo, count, provider);
+    }
+    this.#hayFurbo = hayFurbo;
+  }
+
+  /**
+   * Releases the notification source, if any.
+   */
+  destroy(): void {
+    this.#notificationSource?.destroy(
+      MessageTray.NotificationDestroyedReason.SOURCE_CLOSED,
+    );
+    this.#notificationSource = null;
+    super.destroy();
   }
 
   /**
