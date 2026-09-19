@@ -35,10 +35,30 @@ export default class HayAhoraFutbolPreferences extends ExtensionPreferences {
     });
     window.add(page);
 
+
+    // notifications
+    const notificationsGroup = new Adw.PreferencesGroup({
+      title: _("Notifications"),
+      description: _("Get notified when football starts or ends"),
+    });
+    page.add(notificationsGroup);
+
+    const notificationsRow = new Adw.SwitchRow({
+      title: _("Enable notifications"),
+    });
+    settings.bind(
+      "notifications",
+      notificationsRow,
+      "active",
+      Gio.SettingsBindFlags.DEFAULT,
+    );
+    notificationsGroup.add(notificationsRow);
+
+
     // checking
     const checkingGroup = new Adw.PreferencesGroup({
-      title: _("Checking"),
-      description: _("Configure how the status is checked"),
+      title: _("Refresh"),
+      // description: _("Configure how the status is checked"),
     });
     page.add(checkingGroup);
 
@@ -64,6 +84,20 @@ export default class HayAhoraFutbolPreferences extends ExtensionPreferences {
       description: _("Tune how the football state is derived from blocked IPs"),
     });
     page.add(detectionGroup);
+
+    const ipv6Row = new Adw.SwitchRow({
+      title: _("Include IPv6 addresses"),
+      subtitle: _(
+        "Count IPv6 addresses when evaluating the football state and the IP count",
+      ),
+    });
+    settings.bind(
+      "include-ipv6",
+      ipv6Row,
+      "active",
+      Gio.SettingsBindFlags.DEFAULT,
+    );
+    detectionGroup.add(ipv6Row);
 
     const minISPsRow = new Adw.SpinRow({
       title: _("Minimum ISPs"),
@@ -114,38 +148,6 @@ export default class HayAhoraFutbolPreferences extends ExtensionPreferences {
       settings.set_strv("cf-key-ips", keyIPs);
     });
     detectionGroup.add(keyIPsRow);
-
-    const ipv6Row = new Adw.SwitchRow({
-      title: _("Include IPv6 addresses"),
-      subtitle: _(
-        "Count IPv6 addresses when evaluating the football state and the IP count",
-      ),
-    });
-    settings.bind(
-      "include-ipv6",
-      ipv6Row,
-      "active",
-      Gio.SettingsBindFlags.DEFAULT,
-    );
-    detectionGroup.add(ipv6Row);
-
-    // notifications
-    const notificationsGroup = new Adw.PreferencesGroup({
-      title: _("Notifications"),
-      description: _("Get notified when football starts or ends"),
-    });
-    page.add(notificationsGroup);
-
-    const notificationsRow = new Adw.SwitchRow({
-      title: _("Enable notifications"),
-    });
-    settings.bind(
-      "notifications",
-      notificationsRow,
-      "active",
-      Gio.SettingsBindFlags.DEFAULT,
-    );
-    notificationsGroup.add(notificationsRow);
 
     return Promise.resolve();
   }
