@@ -7,6 +7,11 @@
       <summary>Refresh interval</summary>
       <description>Minutes between automatic status checks.</description>
     </key>
+    <key name="auto-detect-provider" type="b">
+      <default>true</default>
+      <summary>Automatic provider detection</summary>
+      <description>Whether the provider is detected automatically using ip-api.com. When disabled, the aggregate list is used instead.</description>
+    </key>
     <key name="min-isps" type="i">
       <default>2</default>
       <range min="0" max="100"/>

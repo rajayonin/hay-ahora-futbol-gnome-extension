@@ -73,6 +73,9 @@ export default class HayAhoraFutbolExtension extends Extension {
       this.#settings.connect("changed::refresh-interval", () =>
         this.#scheduleRefresh(),
       ),
+      this.#settings.connect("changed::auto-detect-provider", () =>
+        this.refresh(),
+      ),
       this.#settings.connect("changed::min-isps", () => this.#applyStatus()),
       this.#settings.connect("changed::football-ip-threshold", () =>
         this.#applyStatus(),
@@ -211,7 +214,9 @@ export default class HayAhoraFutbolExtension extends Extension {
   async #fetchStatus(): Promise<void> {
     const [blockedByISP, provider] = await Promise.all([
       this.#fetchBlockedByISP(),
-      this.#detectProvider(),
+      this.#settings!.get_boolean("auto-detect-provider")
+        ? this.#detectProvider()
+        : Promise.resolve(ISP.Any),
     ]);
 
     this.#blockedByISP = blockedByISP;

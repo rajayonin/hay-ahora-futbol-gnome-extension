@@ -78,6 +78,20 @@ export default class HayAhoraFutbolPreferences extends ExtensionPreferences {
     });
     checkingGroup.add(refreshRow);
 
+    const autoDetectRow = new Adw.SwitchRow({
+      title: _("Automatic provider detection"),
+      subtitle: _(
+        "Detect your provider with ip-api.com; otherwise the aggregate list is used",
+      ),
+    });
+    settings.bind(
+      "auto-detect-provider",
+      autoDetectRow,
+      "active",
+      Gio.SettingsBindFlags.DEFAULT,
+    );
+    checkingGroup.add(autoDetectRow);
+
     // detection
     const detectionGroup = new Adw.PreferencesGroup({
       title: _("Football detection"),
