@@ -7,16 +7,22 @@
       <summary>Refresh interval</summary>
       <description>Minutes between automatic status checks.</description>
     </key>
-    <key name="threshold" type="i">
-      <default>40</default>
-      <range min="0" max="10000"/>
-      <summary>Football threshold</summary>
-      <description>Number of blocked IPs from which football is considered to be on.</description>
+    <key name="min-isps" type="i">
+      <default>2</default>
+      <range min="0" max="100"/>
+      <summary>Minimum ISPs</summary>
+      <description>An IP counts as widely blocked when more than this many ISPs block it.</description>
     </key>
-    <key name="auto-provider" type="b">
-      <default>true</default>
-      <summary>Automatic provider</summary>
-      <description>Detect the current ISP with ip-api.com. When disabled the check is bypassed and all providers are used.</description>
+    <key name="football-ip-threshold" type="i">
+      <default>10</default>
+      <range min="0" max="10000"/>
+      <summary>Football IP threshold</summary>
+      <description>Football is considered to be on when more than this many widely blocked IPs exist.</description>
+    </key>
+    <key name="cf-key-ips" type="as">
+      <default>['188.114.96.5', '188.114.97.5']</default>
+      <summary>Cloudflare key IPs</summary>
+      <description>Football is considered to be on when every one of these IPs is blocked by at least one ISP. An empty list disables this rule.</description>
     </key>
     <key name="notifications" type="b">
       <default>true</default>

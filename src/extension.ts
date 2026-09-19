@@ -36,6 +36,7 @@ const STATUS_URL = "https://hayahora.futbol/estado";
 const STATUS_PAGE_URL = "https://hayahora.futbol/#estado";
 const IP_API_ENDPOINT = "http://ip-api.com/json/";
 
+// Mirrors the detection logic used by hayahora.futbol
 enum ISP {
   Any = "any",
   Movistar = "movistar",
@@ -44,6 +45,24 @@ enum ISP {
   Orange = "orange",
   MásMóvil = "masmovil",
 }
+
+const ISP_NAMES: Record<ISP, string> = {
+  [ISP.Any]: "any",
+  [ISP.Movistar]: "Movistar",
+  [ISP.DIGI]: "DIGI",
+  [ISP.Vodafone]: "Vodafone",
+  [ISP.Orange]: "Orange",
+  [ISP.MásMóvil]: "MásMóvil",
+};
+
+// Concrete ISPs; `ISP.Any` is the union and is excluded from per-IP counting
+const PROVIDERS = [
+  ISP.Movistar,
+  ISP.DIGI,
+  ISP.Vodafone,
+  ISP.Orange,
+  ISP.MásMóvil,
+];
 
 // ISP values according to ip-api.com
 const ISP_VALUES = new Map<string, ISP>([
@@ -58,20 +77,69 @@ const ISP_VALUES = new Map<string, ISP>([
 ]);
 
 /**
- * Parses the ip-api.com 'isp' values.
+ * Parses the ip-api.com 'isp' value.
  */
-function parseISP(value: string): ISP {
+function parseISP(value: string): ISP | null {
   return (
     ISP_VALUES.get(value) ??
     Object.values(ISP).find(
       (isp) => isp !== ISP.Any && value.toLocaleLowerCase().includes(isp),
     ) ??
-    ISP.Any
+    null
   );
 }
 
+/**
+ * Tunables for the football detection, sourced from the extension settings.
+ */
+interface EvaluationOptions {
+  minISPs: number;
+  footballIPThreshold: number;
+  keyIPs: string[];
+}
+
+/**
+ * Replicates hayahora.futbol's status logic from the per-ISP block lists:
+ * football is on when more than `footballIPThreshold` IPs are blocked by more
+ * than `minISPs` ISPs, or when every key IP is blocked by at least one ISP.
+ *
+ * @param blockedByISP Blocked IPs per ISP
+ * @param options Detection tunables
+ * @returns Total number of blocked IPs and whether football is on
+ */
+function evaluate(
+  blockedByISP: Map<ISP, Set<string>>,
+  options: EvaluationOptions,
+): {
+  blocked: number;
+  hayFutbol: boolean;
+} {
+  const ispsPerIP = new Map<string, number>();
+  const blockedIPs = new Set<string>();
+
+  for (const isp of PROVIDERS) {
+    const ips = blockedByISP.get(isp);
+    if (!ips) continue;
+    for (const ip of ips) {
+      blockedIPs.add(ip);
+      ispsPerIP.set(ip, (ispsPerIP.get(ip) ?? 0) + 1);
+    }
+  }
+
+  const widelyBlocked = [...ispsPerIP.values()].filter(
+    (count) => count > options.minISPs,
+  ).length;
+  const keyPairBlocked =
+    options.keyIPs.length > 0 &&
+    options.keyIPs.every((ip) => blockedIPs.has(ip));
+
+  return {
+    blocked: blockedIPs.size,
+    hayFutbol: widelyBlocked > options.footballIPThreshold || keyPairBlocked,
+  };
+}
+
 interface IndicatorOptions {
-  threshold: number;
   notifications: boolean;
   openPreferences: () => void;
 }
@@ -88,16 +156,12 @@ class Indicator extends PanelMenu.Button {
   #prefsItem: PopupMenu.PopupMenuItem;
   #notificationSource: MessageTray.Source | null = null;
   #hayFurbo: boolean | null = null;
-  #threshold: number;
   #notificationsEnabled: boolean;
-  #lastCount: number | null = null;
-  #lastProvider: ISP | null = null;
   declare public menu: PopupMenu.PopupMenu;
 
   constructor(extensionPath: string, options: IndicatorOptions) {
     super(0.0, _("¿Hay ahora fútbol?"));
 
-    this.#threshold = options.threshold;
     this.#notificationsEnabled = options.notifications;
 
     // reduce horizontal padding in the top bar
@@ -142,9 +206,6 @@ class Indicator extends PanelMenu.Button {
     this.#refreshItem = new PopupMenu.PopupMenuItem(_("Refresh"));
     this.#refreshItem.connect("activate", () => this.emit("refresh"));
     this.menu.addMenuItem(this.#refreshItem);
-
-    // separator
-    this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(""));
 
     // preferences button
     this.#prefsItem = new PopupMenu.PopupMenuItem(_("Preferences"));
@@ -202,7 +263,7 @@ class Indicator extends PanelMenu.Button {
       title: hayFurbo ? _("Hay fútbol") : _("Ya no hay fútbol"),
       body: hayFurbo
         ? _(
-            `${count} blocked IPs (${provider} provider). Some services may be blocked.`,
+            `${count} blocked IPs (${ISP_NAMES[provider]} provider). Some services may be blocked.`,
           )
         : _("Football broadcasts have ended."),
       urgency: hayFurbo ? MessageTray.Urgency.NORMAL : MessageTray.Urgency.LOW,
@@ -224,46 +285,19 @@ class Indicator extends PanelMenu.Button {
   }
 
   /**
-   * Updates the indicator according to the number of blocked IPs
-   * @param count Number of blocked IPs
-   * @param provider Provider that was checked
+   * Updates the indicator with the evaluation of the status data.
+   * @param count Number of blocked IPs for the detected ISP
+   * @param hayFurbo Whether football is considered to be on
+   * @param provider Detected ISP
    */
-  update(count: number, provider: ISP): void {
-    this.#lastCount = count;
-    this.#lastProvider = provider;
-    this.#apply();
-  }
-
-  /**
-   * Updates the football threshold and re-evaluates the current state.
-   * @param threshold New threshold
-   */
-  setThreshold(threshold: number): void {
-    this.#threshold = threshold;
-    this.#apply();
-  }
-
-  /**
-   * Enables/disables notifications on state changes.
-   * @param enabled `true` to notify
-   */
-  setNotificationsEnabled(enabled: boolean): void {
-    this.#notificationsEnabled = enabled;
-  }
-
-  /**
-   * Re-renders the indicator from the last known count.
-   */
-  #apply(): void {
-    const count = this.#lastCount;
-    const provider = this.#lastProvider;
-    if (count === null || provider === null) return;
-
-    const hayFurbo = count > this.#threshold;
+  update(count: number, hayFurbo: boolean, provider: ISP): void {
     this.accessible_name = hayFurbo ? _("Hay fútbol") : _("No hay fútbol");
 
     // update menu
-    this.#countItem.label.text = _(`${count} blocked IPs (${provider})`);
+    this.#countItem.label.text = _(
+      `${count} blocked IPs` +
+        (provider !== ISP.Any ? `(${ISP_NAMES[provider]})` : ""),
+    );
     this.#toggleCountButton(true);
 
     // update icon
@@ -279,6 +313,14 @@ class Indicator extends PanelMenu.Button {
       this.#notify(hayFurbo, count, provider);
     }
     this.#hayFurbo = hayFurbo;
+  }
+
+  /**
+   * Enables/disables notifications on state changes.
+   * @param enabled `true` to notify
+   */
+  setNotificationsEnabled(enabled: boolean): void {
+    this.#notificationsEnabled = enabled;
   }
 
   /**
@@ -326,12 +368,13 @@ export default class HayAhoraFutbolExtension extends Extension {
   #refreshSignalId: number = 0;
   #refreshTimerId: number = 0;
   #settingsSignalIds: number[] = [];
+  #blockedByISP: Map<ISP, Set<string>> | null = null;
+  #provider: ISP = ISP.Any;
 
   enable() {
     this.#settings = this.getSettings();
 
     this.#indicator = new Indicator(this.path, {
-      threshold: this.#settings.get_int("threshold"),
       notifications: this.#settings.get_boolean("notifications"),
       openPreferences: () => this.openPreferences(),
     });
@@ -347,18 +390,19 @@ export default class HayAhoraFutbolExtension extends Extension {
 
     // react to settings changes
     this.#settingsSignalIds = [
-      this.#settings.connect("changed::threshold", () => {
-        this.#indicator?.setThreshold(this.#settings!.get_int("threshold"));
-      }),
       this.#settings.connect("changed::notifications", () => {
         this.#indicator?.setNotificationsEnabled(
           this.#settings!.get_boolean("notifications"),
         );
       }),
-      this.#settings.connect("changed::auto-provider", () => this.refresh()),
       this.#settings.connect("changed::refresh-interval", () =>
         this.#scheduleRefresh(),
       ),
+      this.#settings.connect("changed::min-isps", () => this.#applyStatus()),
+      this.#settings.connect("changed::football-ip-threshold", () =>
+        this.#applyStatus(),
+      ),
+      this.#settings.connect("changed::cf-key-ips", () => this.#applyStatus()),
     ];
 
     this.refresh();
@@ -382,6 +426,7 @@ export default class HayAhoraFutbolExtension extends Extension {
     this.#indicator = null;
     this.#cancellable = null;
     this.#session = null;
+    this.#blockedByISP = null;
   }
 
   /**
@@ -405,73 +450,94 @@ export default class HayAhoraFutbolExtension extends Extension {
   }
 
   /**
-   * Resolves the provider to check. When the `auto-provider` setting is
-   * enabled the ISP is detected; otherwise the check is bypassed and
-   * `ISP.Any` (all providers) is used.
+   * Fetches a URL and returns its body as text.
+   * @param url URL to fetch
    */
-  async #getProvider(): Promise<ISP> {
-    if (this.#settings!.get_boolean("auto-provider"))
-      return this.#detectProvider();
-    return ISP.Any;
-  }
-
-  /**
-   * Detects the provider using ip-api.com. By default, `ISP.Any`.
-   */
-  async #detectProvider(): Promise<ISP> {
-    const msg = Soup.Message.new("GET", IP_API_ENDPOINT);
-    return this.#session!.send_and_read_async(
+  async #fetchText(url: string): Promise<string> {
+    const msg = Soup.Message.new("GET", url);
+    const bytes = await this.#session!.send_and_read_async(
       msg,
       GLib.PRIORITY_DEFAULT,
       this.#cancellable as any, // `as any` bc Glib is being stupid
-    )
-      .then((bytes) => {
-        if (msg.status_code !== Soup.Status.OK)
-          throw new Error(`Provider request returned HTTP ${msg.status_code}`);
-
-        // extract ISP
-        const ispValue = JSON.parse(
-          new TextDecoder().decode(bytes.toArray()),
-        ).isp;
-        return parseISP(ispValue);
-      })
-      .catch((error) => {
-        console.log(`Unable to fetch ISP: ${error.message}`);
-        return ISP.Any;
-      });
+    );
+    if (msg.status_code !== Soup.Status.OK)
+      throw new Error(`Request to ${url} returned HTTP ${msg.status_code}`);
+    return new TextDecoder().decode(bytes.toArray());
   }
 
   /**
-   * Gets the number of blocked ISPs for the specified provider.
+   * Fetches the blocked IP list of every observed ISP.
    */
-  async #getCount(provider: ISP) {
-    const statusMsg = Soup.Message.new(
-      "GET",
-      `${STATUS_URL}/blocked-${provider}.txt`,
-    );
-    this.#session!.send_and_read_async(
-      statusMsg,
-      GLib.PRIORITY_DEFAULT,
-      this.#cancellable as any, // `as any` bc Glib is being stupid
-    )
-      .then((bytes) => {
-        if (statusMsg.status_code !== Soup.Status.OK)
-          throw new Error(
-            `Status request returned HTTP ${statusMsg.status_code}`,
-          );
-
-        // count IPs (one line per IP)
-        const text = new TextDecoder().decode(bytes.toArray());
-        const blockedCount = text
-          .split(/\r?\n/)
-          .filter((line) => line.trim()).length;
-        this.#indicator?.update(blockedCount, provider);
-      })
-      .catch((error) => {
-        this.#indicator?.setError(
-          `Unable to fetch blocked IPs: ${error.message}`,
+  async #fetchBlockedByISP(): Promise<Map<ISP, Set<string>>> {
+    const entries = await Promise.all(
+      Object.values(ISP).map(async (isp) => {
+        const text = await this.#fetchText(`${STATUS_URL}/blocked-${isp}.txt`);
+        const ips = new Set(
+          text
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line),
         );
-      });
+        return [isp, ips] as const;
+      }),
+    );
+    return new Map(entries);
+  }
+
+  /**
+   * Detects the current ISP using ip-api.com.
+   * @returns Detected IP. `ISP.Any` when it can't be mapped.
+   */
+  async #detectProvider(): Promise<ISP> {
+    try {
+      const ispValue = JSON.parse(await this.#fetchText(IP_API_ENDPOINT))
+        .isp as string;
+      return parseISP(ispValue) ?? ISP.Any;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`Unable to fetch ISP: ${message}`);
+      return ISP.Any;
+    }
+  }
+
+  /**
+   * Detection tunables from the current settings.
+   */
+  #evaluationOptions(): EvaluationOptions {
+    return {
+      minISPs: this.#settings!.get_int("min-isps"),
+      footballIPThreshold: this.#settings!.get_int("football-ip-threshold"),
+      keyIPs: this.#settings!.get_strv("cf-key-ips"),
+    };
+  }
+
+  /**
+   * Re-evaluates the last fetched status with the current settings.
+   */
+  #applyStatus(): void {
+    if (!this.#blockedByISP) return;
+
+    const { hayFutbol } = evaluate(
+      this.#blockedByISP,
+      this.#evaluationOptions(),
+    );
+    const count = this.#blockedByISP.get(this.#provider)?.size ?? 0;
+    this.#indicator?.update(count, hayFutbol, this.#provider);
+  }
+
+  /**
+   * Fetches every ISP's block list, evaluates the football state from them and
+   * reports the detected ISP's blocked IP count.
+   */
+  async #fetchStatus(): Promise<void> {
+    const [blockedByISP, provider] = await Promise.all([
+      this.#fetchBlockedByISP(),
+      this.#detectProvider(),
+    ]);
+
+    this.#blockedByISP = blockedByISP;
+    this.#provider = provider;
+    this.#applyStatus();
   }
 
   /**
@@ -483,8 +549,10 @@ export default class HayAhoraFutbolExtension extends Extension {
     this.#refreshInProgress = true;
     this.#indicator.setRefreshing(true);
 
-    this.#getProvider()
-      .then((p) => this.#getCount(p))
+    this.#fetchStatus()
+      .catch((error) => {
+        this.#indicator?.setError(`Unable to fetch status: ${error.message}`);
+      })
       .finally(() => {
         this.#refreshInProgress = false;
         this.#indicator?.setRefreshing(false);

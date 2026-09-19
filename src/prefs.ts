@@ -58,10 +58,35 @@ export default class HayAhoraFutbolPreferences extends ExtensionPreferences {
     });
     checkingGroup.add(refreshRow);
 
-    const thresholdRow = new Adw.SpinRow({
-      title: _("Threshold"),
+    // detection
+    const detectionGroup = new Adw.PreferencesGroup({
+      title: _("Football detection"),
+      description: _("Tune how the football state is derived from blocked IPs"),
+    });
+    page.add(detectionGroup);
+
+    const minISPsRow = new Adw.SpinRow({
+      title: _("Minimum ISPs"),
       subtitle: _(
-        "Number of blocked IPs from which football is considered to be on",
+        "An IP is widely blocked when more than this many ISPs block it",
+      ),
+      adjustment: new Gtk.Adjustment({
+        lower: 0,
+        upper: 100,
+        step_increment: 1,
+        page_increment: 1,
+      }),
+    });
+    minISPsRow.value = settings.get_int("min-isps");
+    minISPsRow.connect("notify::value", () => {
+      settings.set_int("min-isps", minISPsRow.value);
+    });
+    detectionGroup.add(minISPsRow);
+
+    const thresholdRow = new Adw.SpinRow({
+      title: _("Football IP threshold"),
+      subtitle: _(
+        "Football is on when more than this many widely blocked IPs exist",
       ),
       adjustment: new Gtk.Adjustment({
         lower: 0,
@@ -70,32 +95,25 @@ export default class HayAhoraFutbolPreferences extends ExtensionPreferences {
         page_increment: 10,
       }),
     });
-    thresholdRow.value = settings.get_int("threshold");
+    thresholdRow.value = settings.get_int("football-ip-threshold");
     thresholdRow.connect("notify::value", () => {
-      settings.set_int("threshold", thresholdRow.value);
+      settings.set_int("football-ip-threshold", thresholdRow.value);
     });
-    checkingGroup.add(thresholdRow);
+    detectionGroup.add(thresholdRow);
 
-    // provider
-    const providerGroup = new Adw.PreferencesGroup({
-      title: _("Provider"),
-      description: _("Which provider's blocked IPs are checked"),
+    const keyIPsRow = new Adw.EntryRow({
+      title: _("Cloudflare key IPs"),
+      show_apply_button: true,
     });
-    page.add(providerGroup);
-
-    const autoProviderRow = new Adw.SwitchRow({
-      title: _("Automatic provider"),
-      subtitle: _(
-        "Detect your ISP with ip-api.com; otherwise the check is bypassed and all providers are used",
-      ),
+    keyIPsRow.text = settings.get_strv("cf-key-ips").join(", ");
+    keyIPsRow.connect("apply", () => {
+      const keyIPs = keyIPsRow.text
+        .split(",")
+        .map((ip) => ip.trim())
+        .filter((ip) => ip);
+      settings.set_strv("cf-key-ips", keyIPs);
     });
-    settings.bind(
-      "auto-provider",
-      autoProviderRow,
-      "active",
-      Gio.SettingsBindFlags.DEFAULT,
-    );
-    providerGroup.add(autoProviderRow);
+    detectionGroup.add(keyIPsRow);
 
     // notifications
     const notificationsGroup = new Adw.PreferencesGroup({
