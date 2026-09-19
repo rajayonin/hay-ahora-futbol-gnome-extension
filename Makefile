@@ -5,12 +5,12 @@ PACK_NAME=$(NAME)@$(DOMAIN)
 
 .PHONY: all pack install clean
 
-all: dist/extension.js dist/prefs.js
+all: dist/extension.js dist/indicator.js dist/library.js dist/prefs.js
 
 bun.lock: package.json
 	bun install
 
-dist/extension.js dist/prefs.js: bun.lock ambient.d.ts src/*.ts
+dist/extension.js dist/indicator.js dist/library.js dist/prefs.js: bun.lock ambient.d.ts src/*.ts
 	bun run build
 
 schemas/gschemas.compiled: schemas/$(SCHEMA_ID).gschema.xml
