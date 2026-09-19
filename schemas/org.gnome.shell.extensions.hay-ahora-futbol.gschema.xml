@@ -24,6 +24,11 @@
       <summary>Cloudflare key IPs</summary>
       <description>Football is considered to be on when every one of these IPs is blocked by at least one ISP. An empty list disables this rule.</description>
     </key>
+    <key name="include-ipv6" type="b">
+      <default>true</default>
+      <summary>Include IPv6</summary>
+      <description>Whether IPv6 addresses are counted when evaluating the football state and the blocked IP count.</description>
+    </key>
     <key name="notifications" type="b">
       <default>true</default>
       <summary>Notifications</summary>

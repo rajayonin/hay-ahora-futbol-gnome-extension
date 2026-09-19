@@ -139,6 +139,28 @@ function evaluate(
   };
 }
 
+/**
+ * Removes IPv6 addresses from the per-ISP block lists when they are excluded.
+ *
+ * @param blockedByISP Blocked IPs per ISP
+ * @param includeIPv6 Whether to keep IPv6 addresses
+ * @returns The (possibly filtered) block lists
+ */
+function filterBlockedByISP(
+  blockedByISP: Map<ISP, Set<string>>,
+  includeIPv6: boolean,
+): Map<ISP, Set<string>> {
+  if (includeIPv6) return blockedByISP;
+
+  const filtered = new Map<ISP, Set<string>>();
+  for (const [isp, ips] of blockedByISP)
+    filtered.set(
+      isp,
+      new Set([...ips].filter((ip) => !ip.includes(":"))),
+    );
+  return filtered;
+}
+
 interface IndicatorOptions {
   notifications: boolean;
   openPreferences: () => void;
@@ -403,6 +425,9 @@ export default class HayAhoraFutbolExtension extends Extension {
         this.#applyStatus(),
       ),
       this.#settings.connect("changed::cf-key-ips", () => this.#applyStatus()),
+      this.#settings.connect("changed::include-ipv6", () =>
+        this.#applyStatus(),
+      ),
     ];
 
     this.refresh();
@@ -517,11 +542,12 @@ export default class HayAhoraFutbolExtension extends Extension {
   #applyStatus(): void {
     if (!this.#blockedByISP) return;
 
-    const { hayFutbol } = evaluate(
+    const blockedByISP = filterBlockedByISP(
       this.#blockedByISP,
-      this.#evaluationOptions(),
+      this.#settings!.get_boolean("include-ipv6"),
     );
-    const count = this.#blockedByISP.get(this.#provider)?.size ?? 0;
+    const { hayFutbol } = evaluate(blockedByISP, this.#evaluationOptions());
+    const count = blockedByISP.get(this.#provider)?.size ?? 0;
     this.#indicator?.update(count, hayFutbol, this.#provider);
   }
 

@@ -115,6 +115,20 @@ export default class HayAhoraFutbolPreferences extends ExtensionPreferences {
     });
     detectionGroup.add(keyIPsRow);
 
+    const ipv6Row = new Adw.SwitchRow({
+      title: _("Include IPv6 addresses"),
+      subtitle: _(
+        "Count IPv6 addresses when evaluating the football state and the IP count",
+      ),
+    });
+    settings.bind(
+      "include-ipv6",
+      ipv6Row,
+      "active",
+      Gio.SettingsBindFlags.DEFAULT,
+    );
+    detectionGroup.add(ipv6Row);
+
     // notifications
     const notificationsGroup = new Adw.PreferencesGroup({
       title: _("Notifications"),
