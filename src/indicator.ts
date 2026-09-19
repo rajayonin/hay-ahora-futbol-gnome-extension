@@ -187,7 +187,7 @@ export class Indicator extends PanelMenu.Button {
     // update menu
     this.#countItem.label.text = _(
       `${count} blocked IPs` +
-        (provider !== ISP.Any ? `(${ISP_NAMES[provider]})` : ""),
+        (provider !== ISP.Any ? ` (${ISP_NAMES[provider]})` : ""),
     );
     this.#toggleCountButton(true);
 
