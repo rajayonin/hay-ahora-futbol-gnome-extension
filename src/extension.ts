@@ -32,6 +32,8 @@ import {
   filterBlockedByISP,
   parseISP,
 } from "./library.js";
+
+import { parseIconTheme } from "./icons.js";
 import { Indicator } from "./indicator.js";
 
 export default class HayAhoraFutbolExtension extends Extension {
@@ -51,6 +53,7 @@ export default class HayAhoraFutbolExtension extends Extension {
 
     this.#indicator = new Indicator(this.path, {
       notifications: this.#settings.get_boolean("notifications"),
+      iconTheme: parseIconTheme(this.#settings.get_string("icon-theme")),
       openPreferences: () => this.openPreferences(),
     });
     this.#session = new Soup.Session({ timeout: 10 });
@@ -83,6 +86,11 @@ export default class HayAhoraFutbolExtension extends Extension {
       this.#settings.connect("changed::cf-key-ips", () => this.#applyStatus()),
       this.#settings.connect("changed::include-ipv6", () =>
         this.#applyStatus(),
+      ),
+      this.#settings.connect("changed::icon-theme", () =>
+        this.#indicator?.setIconTheme(
+          parseIconTheme(this.#settings!.get_string("icon-theme")),
+        ),
       ),
     ];
 

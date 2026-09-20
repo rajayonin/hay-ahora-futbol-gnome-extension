@@ -25,6 +25,16 @@ import {
   gettext as _,
 } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 
+import {
+  ICON_THEMES,
+  ICON_THEME_FROM_NAME,
+  ICON_THEME_NAMES,
+  IconState,
+  IconTheme,
+  iconPath,
+  parseIconTheme,
+} from "./icons.js";
+
 export default class HayAhoraFutbolPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window: Adw.PreferencesWindow): Promise<void> {
     const settings = this.getSettings();
@@ -34,7 +44,6 @@ export default class HayAhoraFutbolPreferences extends ExtensionPreferences {
       icon_name: "dialog-information-symbolic",
     });
     window.add(page);
-
 
     // notifications
     const notificationsGroup = new Adw.PreferencesGroup({
@@ -53,6 +62,51 @@ export default class HayAhoraFutbolPreferences extends ExtensionPreferences {
       Gio.SettingsBindFlags.DEFAULT,
     );
     notificationsGroup.add(notificationsRow);
+
+
+    // appearance
+    const appearanceGroup = new Adw.PreferencesGroup({
+      title: _("Appearance"),
+      description: _("Choose the icon theme shown in the top bar"),
+    });
+    page.add(appearanceGroup);
+
+    const themeModel = new Gtk.StringList();
+    for (const theme of ICON_THEMES) themeModel.append(ICON_THEME_NAMES[theme]);
+
+    const themeRow = new Adw.ComboRow({
+      title: _("Icon theme"),
+      model: themeModel,
+    });
+
+    const themeFactory = new Gtk.SignalListItemFactory();
+    themeFactory.connect("setup", (_factory, listItem) => {
+      const item = listItem as Gtk.ListItem;
+      const box = new Gtk.Box({ spacing: 12 });
+      box.append(new Gtk.Image({ pixel_size: 24 }));
+      box.append(new Gtk.Label({ xalign: 0 }));
+      item.child = box;
+    });
+    themeFactory.connect("bind", (_factory, listItem) => {
+      const item = listItem as Gtk.ListItem;
+      const name = (item.item as Gtk.StringObject).string;
+      const theme = ICON_THEME_FROM_NAME[name] ?? IconTheme.Symbolic;
+      const box = item.child as Gtk.Box;
+      const image = box.get_first_child() as Gtk.Image;
+      const label = image.get_next_sibling() as Gtk.Label;
+      image.file = iconPath(this.path, theme, IconState.Football);
+      label.label = ICON_THEME_NAMES[theme];
+    });
+    themeRow.factory = themeFactory;
+
+    themeRow.selected = Math.max(
+      0,
+      ICON_THEMES.indexOf(parseIconTheme(settings.get_string("icon-theme"))),
+    );
+    themeRow.connect("notify::selected", () => {
+      settings.set_string("icon-theme", ICON_THEMES[themeRow.selected]);
+    });
+    appearanceGroup.add(themeRow);
 
 
     // checking

@@ -39,5 +39,10 @@
       <summary>Notifications</summary>
       <description>Whether to notify when football starts or ends.</description>
     </key>
+    <key name="icon-theme" type="s">
+      <default>'symbolic'</default>
+      <summary>Icon theme</summary>
+      <description>Icon theme used for the top bar indicator.</description>
+    </key>
   </schema>
 </schemalist>

@@ -30,18 +30,20 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 import { ISP, ISP_NAMES, STATUS_PAGE_URL } from "./library.js";
 
+import { IconState, IconTheme, iconPath } from "./icons.js";
+
 export interface IndicatorOptions {
   notifications: boolean;
+  iconTheme: IconTheme;
   openPreferences: () => void;
 }
 
 export class Indicator extends PanelMenu.Button {
   #icon: St.Icon;
-  #GICONS: {
-    football: Gio.Icon;
-    noFootball: Gio.Icon;
-    error: Gio.Icon;
-  };
+  #GICONS: Record<IconState, Gio.Icon>;
+  #extensionPath: string;
+  #theme: IconTheme;
+  #iconState: IconState = IconState.Error;
   #countItem: PopupMenu.PopupMenuItem;
   #refreshItem: PopupMenu.PopupMenuItem;
   #prefsItem: PopupMenu.PopupMenuItem;
@@ -53,27 +55,19 @@ export class Indicator extends PanelMenu.Button {
   constructor(extensionPath: string, options: IndicatorOptions) {
     super(0.0, _("¿Hay ahora fútbol?"));
 
+    this.#extensionPath = extensionPath;
+    this.#theme = options.iconTheme;
     this.#notificationsEnabled = options.notifications;
 
     // reduce horizontal padding in the top bar
     this.add_style_class_name("haf-panel-button");
 
     // define set of icons
-    this.#GICONS = {
-      football: Gio.icon_new_for_string(
-        `${extensionPath}/icons/ball-football.svg`,
-      ),
-      noFootball: Gio.icon_new_for_string(
-        `${extensionPath}/icons/ball-football-off.svg`,
-      ),
-      error: Gio.icon_new_for_string(
-        `${extensionPath}/icons/ball-football-error.svg`,
-      ),
-    };
+    this.#GICONS = this.#buildIcons();
 
     // icon
     this.#icon = new St.Icon({
-      gicon: this.#GICONS.error,
+      gicon: this.#GICONS[IconState.Error],
       style_class: "system-status-icon",
     }); // default
     this.add_child(this.#icon);
@@ -105,6 +99,43 @@ export class Indicator extends PanelMenu.Button {
   }
 
   /**
+   * Builds the icon set for the current theme.
+   */
+  #buildIcons(): Record<IconState, Gio.Icon> {
+    return {
+      [IconState.Football]: Gio.icon_new_for_string(
+        iconPath(this.#extensionPath, this.#theme, IconState.Football),
+      ),
+      [IconState.NoFootball]: Gio.icon_new_for_string(
+        iconPath(this.#extensionPath, this.#theme, IconState.NoFootball),
+      ),
+      [IconState.Error]: Gio.icon_new_for_string(
+        iconPath(this.#extensionPath, this.#theme, IconState.Error),
+      ),
+    };
+  }
+
+  /**
+   * Sets the icon for a state, remembering it to reapply on theme changes.
+   * @param state Indicator state
+   */
+  #setIcon(state: IconState): void {
+    this.#iconState = state;
+    this.#icon.gicon = this.#GICONS[state];
+  }
+
+  /**
+   * Switches the icon theme, preserving the current state.
+   * @param theme New icon theme
+   */
+  setIconTheme(theme: IconTheme): void {
+    if (theme === this.#theme) return;
+    this.#theme = theme;
+    this.#GICONS = this.#buildIcons();
+    this.#icon.gicon = this.#GICONS[this.#iconState];
+  }
+
+  /**
    * Opens the URL with the default browser
    * @param url URL to open
    */
@@ -131,7 +162,7 @@ export class Indicator extends PanelMenu.Button {
     if (!this.#notificationSource) {
       this.#notificationSource = new MessageTray.Source({
         title: _("¿Hay ahora fútbol?"),
-        icon: this.#GICONS.football,
+        icon: this.#GICONS[IconState.Football],
       });
       this.#notificationSource.connect("destroy", () => {
         this.#notificationSource = null;
@@ -192,9 +223,7 @@ export class Indicator extends PanelMenu.Button {
     this.#toggleCountButton(true);
 
     // update icon
-    this.#icon.gicon = hayFurbo
-      ? this.#GICONS.football
-      : this.#GICONS.noFootball;
+    this.#setIcon(hayFurbo ? IconState.Football : IconState.NoFootball);
 
     // notify on transitions (not on every refresh): when football
     // starts (including the first check) and when it stops
@@ -239,7 +268,7 @@ export class Indicator extends PanelMenu.Button {
    */
   setError(message: string) {
     // update icon
-    this.#icon.gicon = this.#GICONS.error;
+    this.#setIcon(IconState.Error);
 
     // update count
     this.#countItem.label.text = _("Unable to refresh");
