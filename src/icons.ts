@@ -16,37 +16,41 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-// Icon themes bundled with the extension
+// icon themes bundled with the extension
 export enum IconTheme {
   Symbolic = "symbolic",
+  GNOME = "gnome",
   Tebas = "tebas",
 }
 
-export const ICON_THEMES = [IconTheme.Symbolic, IconTheme.Tebas];
+// list of icon themes
+export const ICON_THEMES = Object.values(IconTheme);
 
-export const ICON_THEME_NAMES: Record<IconTheme, string> = {
-  [IconTheme.Symbolic]: "Symbolic",
-  [IconTheme.Tebas]: "Tebas",
+// theme metadata
+const ICON_THEME_META: Record<IconTheme, { name: string; type: string }> = {
+  [IconTheme.Symbolic]: { name: "Symbolic", type: "svg" },
+  [IconTheme.GNOME]: { name: "GNOME", type: "svg" },
+  [IconTheme.Tebas]: { name: "Tebas", type: "png" },
 };
 
-// Reverse of ICON_THEME_NAMES, to map back the display name shown by the
-// preferences combo to its theme
+// maps icon theme to display name
+export const ICON_THEME_NAMES = Object.fromEntries(
+  ICON_THEMES.map((theme) => [theme, ICON_THEME_META[theme].name]),
+) as Record<IconTheme, string>;
+
+// maps display name to icon theme
 export const ICON_THEME_FROM_NAME: Record<string, IconTheme> =
   Object.fromEntries(
     ICON_THEMES.map((theme) => [ICON_THEME_NAMES[theme], theme]),
   );
 
-// Indicator states; each maps to an icon file
+
+// indicator states (maps to icon filename)
 export enum IconState {
   Football = "furbo",
   NoFootball = "noFurbo",
   Error = "error",
 }
-
-const ICON_TYPE: Record<IconTheme, string> = {
-  [IconTheme.Symbolic]: "svg",
-  [IconTheme.Tebas]: "png",
-};
 
 /**
  * Absolute path of an icon file for a theme and state.
@@ -59,7 +63,7 @@ export function iconPath(
   theme: IconTheme,
   state: IconState,
 ): string {
-  return `${extensionPath}/icons/${theme}/${state}.${ICON_TYPE[theme]}`;
+  return `${extensionPath}/icons/${theme}/${state}.${ICON_THEME_META[theme].type}`;
 }
 
 /**

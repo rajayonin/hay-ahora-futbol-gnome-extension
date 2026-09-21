@@ -1,0 +1,1 @@
+Icons derived from [GNOME Icon Development Kit](https://gitlab.gnome.org/Teams/Design/icon-development-kit), licensed under CC0 1.0 Universal (see [lICENSE.md](LICENSE.md)).
