@@ -111,6 +111,8 @@ export default class HayAhoraFutbolExtension extends Extension {
     this.#cancellable?.cancel();
     this.#indicator!.disconnect(this.#refreshSignalId);
 
+    this.#session?.abort();
+
     this.#indicator!.destroy();
     this.#indicator = null;
     this.#cancellable = null;
